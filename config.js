@@ -3,9 +3,9 @@
     exports.dbsize = 100
     exports.authors = []
     exports.authors[0] = {}
-    exports.authors[0].matNr     = '0230699'
-    exports.authors[0].firstName = 'Michael'
-    exports.authors[0].lastName  = 'Glatzhofer'
+    exports.authors[0].matNr     = ''
+    exports.authors[0].firstName = ''
+    exports.authors[0].lastName  = ''
     exports.authors[1] = {}
     exports.authors[1].matNr     = ''
     exports.authors[1].firstName = 'config.js must contain'

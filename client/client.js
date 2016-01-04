@@ -33,13 +33,16 @@ app.search = function(queryView, param)
     // The code in this function is meant to provide you with examples on how
     // to use the various functions. Most of it does *not* belong here in your
     // solution.
+    sim.log("print leck mi do")
+
+    sim.log('app', 'log', '⟶', param)
 
 
-
-    
     queryView.oncancelclick = function()
     {
+        sim.log("print dsfdasfdasfafaf")
         sim.log('app', 'log', 'user clicked cancel')
+
     }
 
     // use sim.log instead of console.log to enable and disable
@@ -134,6 +137,8 @@ app.onMessage = function(c, parsed)
     {
         onWsMessage: function(c, parsed)
         { sim.log('app', 'log', '⟵', parsed)
+            sim.log("dfdsafdsfsadfdasfasfads")
+
 
             var messageHandlers =
             {
@@ -246,6 +251,8 @@ app.networkInfo = function()
 
     netInfo.activeChange = function(nodes)
     { sim.log('app', 'log', '⟶', nodes)
+        sim.log("======== app.networkInfo")
+
 
         if (nodes[app.clientId])
             sim.config = nodes[app.clientId].simconfig
