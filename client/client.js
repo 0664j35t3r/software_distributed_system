@@ -33,6 +33,9 @@ app.search = function(queryView, param)
     // The code in this function is meant to provide you with examples on how
     // to use the various functions. Most of it does *not* belong here in your
     // solution.
+
+
+
     
     queryView.oncancelclick = function()
     {
