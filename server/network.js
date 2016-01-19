@@ -66,7 +66,7 @@ network.wss.on('connection', function (ws)
         }
     })
     ws.on('close', function onClose(code, msg)
-    {        
+    {
         delete network.connections[connection.id]
         network.onConnectionChanged('Disconnected', connection)
     })
@@ -78,7 +78,3 @@ network.wss.on('connection', function (ws)
 })
 
 exports.network = network
-
-
-
-

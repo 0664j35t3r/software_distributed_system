@@ -17,6 +17,8 @@ On Macs with the [Homebrew](http://brew.sh) package manager installed, use:
 
 All required libraries are pre-installed in the repository.
 
+Download test data from https://student.cgv.tugraz.at/assets/db.zip
+and unpack it to a folder `db`.
 
 Starting the server:
 --------------------

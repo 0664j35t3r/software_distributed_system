@@ -79,7 +79,8 @@ function searchView(dbItem, tabId)
             for(var j = 0; j < i; j++)
             {
                 var current = dbItems[j]
-                if (current.mid == matchItem.mid)
+                //if (current.mid == matchItem.mid)
+                if(current.dbEntity.mid == matchItem.dbEntity.mid)
                 {                    
                     viewElement.header.style.backgroundColor = 'red'
                 }

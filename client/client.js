@@ -6,7 +6,11 @@ app.setClientId = function(yourId)
     app.clientId = yourId    
     view.setConnectionInfo('Connected as client ' + 'C' + Number(app.clientId).toSubscript())
 }
-
+app.activeQueries = {}
+app.nextQueryId = 0
+app.cancelQuery = {}
+app.timeouts = {}
+app.status = {}
 
 // called by GUI --------------------------------------------------------------------------
 
@@ -33,75 +37,64 @@ app.search = function(queryView, param)
     // The code in this function is meant to provide you with examples on how
     // to use the various functions. Most of it does *not* belong here in your
     // solution.
-    sim.log("print leck mi do")
-
-    sim.log('app', 'log', '⟶', param)
-
 
     queryView.oncancelclick = function()
     {
-        sim.log("print dsfdasfdasfafaf")
         sim.log('app', 'log', 'user clicked cancel')
 
+        if(param.config.cancelOnFatalEnabled)
+        {
+            var qView = Object.keys(app.activeQueries)
+            for (var i = 0; i < qView.length; i++)
+            {
+                if (app.activeQueries[qView[i]] == queryView)
+                {
+                    var msg = messages.searchCancelMsg(qView[i])
+                    var channelMsg = messages.channelMsg('Job', msg)
+                    network.connection.send(channelMsg)
+                    app.activeQueries[qView[i]] = undefined
+                    clearTimeout(app.timeouts[qView[i]])
+                }
+            }
+            queryView.updateViewState('failed', 'Canceled Search')
+        }
     }
 
     // use sim.log instead of console.log to enable and disable
     // console messages acording to the ☍Network Panel
     sim.log('app', 'log', '⟶', param)
 
-    /// use sim.pointOfFailure in order to simulate errors
-    try
-    {
-        sim.pointOfFailure('u1', network.connection)
-    }
-    catch(e)
-    {
-        queryView.updateViewState('failed', e)
-        throw e
-    }
+    var qId = app.clientId + '-' + app.nextQueryId++
+    app.activeQueries[qId] = queryView
+    var msg = messages.searchMsg(param, 0, qId)
+    var channelMsg = messages.channelMsg('Job', msg)
+    network.connection.send(channelMsg)
 
-    queryView.setResultItems([{
-        dbEntity:{
-            mid: 7,
-            thumbnailUrl:'../db/thumbnails/m7_thumb.png'
-        },
-        diff:9
-    },
+    app.status[qId] = 'running'
+    queryView.updateViewState('running', 'Search is running: ', 0)
+
+    app.timeouts[qId] = setTimeout(function()
     {
-        dbEntity:{
-            mid: 7,
-            thumbnailUrl:'../db/thumbnails/m7_thumb.png'
-        },
-        diff:9
-    }])
+        var qView = Object.keys(app.activeQueries)
+        for(var i = 0; i < qView.length; i++)
+        {
+            if(app.activeQueries[qView[i]] == queryView)
+            {
+                app.status[qView[i]] = 'failed'
+                queryView.updateViewState('failed', 'Overall Timeout')
 
-    var first = 50;
-    var last = 99;
-    app.db.visitRange(first, last, function(entity, idx, isLast)
-    {
-        // the delay is implemented with a timer,
-        // this function is called in a timer callback if delay is activated.
-        // so catch exceptions here (never throw a exceptin to a timer callback)
-        try {
-            sim.log('own', 'log', 'visiting', idx, entity)
-            queryView.updateViewState('running', 'Running local search on entity: ' + idx, idx)
+                if(param.config.cancelOnFatalEnabled)
+                {
+                    var msg = messages.searchCancelMsg(qView[i])
+                    var channelMsg = messages.channelMsg('Job', msg)
+                    network.connection.send(channelMsg)
+                }
 
-            // After half of the work, simulate a "point of failure."
-            // Depending on the configuration, sim.pointOfFailure might
-            // close your connection, throw an exception, return 'stopWork', or
-            // just do nothing.
-            // THIS IS NECESSARY FOR THE TEST CASES TO WORK.
-            if (idx >= (first + last) / 2)
-                if(sim.pointOfFailure('atWork') === 'stopWork')
-                    return 'abort';
-
-            if (isLast)
-                queryView.updateViewState('ok', 'we did something')
-        } catch(e) {
-            // Handle the exception hrrtr 
-            return 'abort';
+                app.activeQueries[qView[i]] = undefined
+            }
         }
-    })
+
+    }, param.config.overallTimeout);
 
 }
 
@@ -137,8 +130,6 @@ app.onMessage = function(c, parsed)
     {
         onWsMessage: function(c, parsed)
         { sim.log('app', 'log', '⟵', parsed)
-            sim.log("dfdsafdsfsadfdasfasfads")
-
 
             var messageHandlers =
             {
@@ -166,6 +157,195 @@ app.onMessage = function(c, parsed)
             sim.pointOfFailure('onRequest', c)
 
             // STUDENT TODO:
+            var msgHandlers =
+            {
+                onSearch: function(c, parsed)
+                {
+                    console.log("SEARCH request received at Client!")
+                    app.cancelQuery[parsed.id] = 0
+                    var first = parsed.range.begin
+                    var last = parsed.range.end
+                    var results = []
+                    try{ app.db.visitRange(first, last, function(entity, idx, isLast)
+                    {
+                        // the delay is implemented with a timer,
+                        // this function is called in a timer callback if delay is activated.
+                        // so catch exceptions here (never throw a exceptin to a timer callback)
+                        try {
+                            sim.log('own', 'log', 'visiting', idx, entity)
+                            // After half of the work, simulate a "point of failure."
+                            // Depending on the configuration, sim.pointOfFailure might
+                            // close your connection, throw an exception, return 'stopWork', or
+                            // just do nothing.
+                            // THIS IS NECESSARY FOR THE TEST CASES TO WORK.
+                            if (idx >= (first + last) / 2)
+                                if(sim.pointOfFailure('atWork') === 'stopWork')
+                                    return 'abort';
+
+                            if(app.cancelQuery[parsed.id] == 1)
+                            {
+                                return 'abort'
+                            }
+
+                            // Change the modulo value for different interval
+                            if(((idx - first) % 1) == 0)
+                            {
+                                var msg = messages.searchProgressMsg(1, parsed.id)
+                                var channelMsg = messages.channelMsg('Job', msg)
+                                network.connection.send(channelMsg)
+                            }
+
+                            var ret = compareEntity(entity, parsed.param)
+                            if(ret !== undefined)
+                            {
+                                results.push(ret)
+                                var msg = messages.searchResponseMsg(results, parsed.id, 0)
+                                var channelMsg = messages.channelMsg('Job', msg)
+                                network.connection.send(channelMsg)
+                            }
+
+                            if (isLast)
+                            {
+                                var msg = messages.searchResponseMsg(results, parsed.id, 1)
+                                var channelMsg = messages.channelMsg('Job', msg)
+                                network.connection.send(channelMsg)
+                            }
+
+                        } catch(e) {
+                            // Handle the exception here
+                            console.log("Error occured at Work: " + e)
+                            if(e.message == 'fatal')
+                            {
+                                var msg = messages.searchExceptionMsg('fatal', parsed.id)
+                                var channelMsg = messages.channelMsg('Job', msg)
+                                network.connection.send(channelMsg)
+                                return 'abort';
+                            }
+                            if(e.message == 'recoverable')
+                            {
+                                var msg = messages.searchExceptionMsg('recoverable', parsed.id)
+                                var channelMsg = messages.channelMsg('Job', msg)
+                                network.connection.send(channelMsg)
+                                return 'abort';
+                            }
+                        }
+                    }) }
+                    catch(e) {
+                        console.log("Error occured befor Work: " + e)
+                        if(e.message == 'fatal')
+                        {
+                            var msg = messages.searchExceptionMsg('fatalb', parsed.id)
+                            var channelMsg = messages.channelMsg('Job', msg)
+                            network.connection.send(channelMsg)
+                            return 'abort';
+                        }
+                        if(e.message == 'recoverable')
+                        {
+                            var msg = messages.searchExceptionMsg('recoverableb', parsed.id)
+                            var channelMsg = messages.channelMsg('Job', msg)
+                            network.connection.send(channelMsg)
+                            return 'abort';
+                        }
+                    }
+                },
+
+                onMatches: function(c, parsed)
+                {
+                    console.log("MATCHES answer received at Client!")
+
+                    if(app.activeQueries[parsed.id] == undefined)
+                        return
+
+                    if(app.status[parsed.id] != 'failed2')
+                        app.activeQueries[parsed.id].setResultItems(parsed.results)
+
+                    if (parsed.finished == 1 && app.status[parsed.id] == 'failed1')
+                    {
+                        app.activeQueries[parsed.id].updateViewState('failed', 'Discon | Exception')
+                        app.activeQueries[parsed.id] = undefined
+                        clearTimeout(app.timeouts[parsed.id])
+                    }
+
+                    else if (parsed.finished == 1 && app.status[parsed.id] == 'failed2')
+                    {
+                        app.activeQueries[parsed.id] = undefined
+                        clearTimeout(app.timeouts[parsed.id])
+                    }
+
+                    else if (parsed.finished == 1 && app.status[parsed.id] != 'failed')
+                    {
+                        app.activeQueries[parsed.id].updateViewState('ok', 'Search finished!')
+                        app.activeQueries[parsed.id] = undefined
+                        clearTimeout(app.timeouts[parsed.id])
+                    }
+
+                    else if (parsed.finished == 2 && app.status[parsed.id] != 'failed')
+                    {
+                        app.activeQueries[parsed.id].updateViewState('failed', 'Other Reason!')
+                        app.activeQueries[parsed.id] = undefined
+                        clearTimeout(app.timeouts[parsed.id])
+                    }
+                },
+
+                onProgress: function(c, parsed)
+                {
+                    if(app.activeQueries[parsed.id] == undefined || app.status[parsed.id] == 'failed' || app.status[parsed.id] == 'failed2')
+                        return
+
+                    app.activeQueries[parsed.id].updateViewState('running', 'Search is running: ', parsed.percent)
+                },
+
+                onException: function(c, parsed)
+                {
+                    if(app.activeQueries[parsed.id] == undefined|| app.status[parsed.id] == 'failed')
+                        return
+
+                    clearTimeout(app.timeouts[parsed.id])
+                    app.status[parsed.id] = 'failed'
+
+                    if(parsed.exception == 'fatal')
+                    {
+                        app.status[parsed.id] = 'failed2'
+                        app.activeQueries[parsed.id].updateViewState('failed', 'Fatal error at Work!')
+                        console.log("Fatal error at Work received at Client!")
+                    }
+
+                    if(parsed.exception == 'recoverable')
+                    {
+                        app.status[parsed.id] = 'failed1'
+                        //app.activeQueries[parsed.id].updateViewState('failed', 'Recoverable error at Work!')
+                        console.log("Recoverable error at Work received at Client!")
+                    }
+
+                    if(parsed.exception == 'fatalb')
+                    {
+                        app.status[parsed.id] = 'failed2'
+                        app.activeQueries[parsed.id].updateViewState('failed', 'Fatal error before Work!')
+                        console.log("Fatal error beforew Work received at Client!")
+                    }
+
+                    if(parsed.exception == 'recoverableb')
+                    {
+                        app.status[parsed.id] = 'failed1'
+                        //app.activeQueries[parsed.id].updateViewState('failed', 'Recoverable error before Work!')
+                        console.log("Recoverable error before Work received at Client!")
+                    }
+
+                    if(parsed.exception == 'discon')
+                    {
+                        app.status[parsed.id] = 'failed1'
+                        //app.activeQueries[parsed.id].updateViewState('failed', 'Client disconnected!')
+                        console.log("Disconection received at Client!")
+                    }
+                },
+
+                onCancel: function(c, parsed)
+                {
+                    console.log("----------------------Recieved Cancel!")
+                    app.cancelQuery[parsed.id] = 1
+                }
+
+            }['on'+parsed.type](c, parsed)
         }
 
     }['on'+parsed.type+'Message'](c, parsed.payload)
@@ -251,8 +431,6 @@ app.networkInfo = function()
 
     netInfo.activeChange = function(nodes)
     { sim.log('app', 'log', '⟶', nodes)
-        sim.log("======== app.networkInfo")
-
 
         if (nodes[app.clientId])
             sim.config = nodes[app.clientId].simconfig

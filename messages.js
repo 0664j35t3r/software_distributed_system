@@ -27,28 +27,60 @@
     // These messages are intended to be sent over the 'Job' channel,
     // i.e. they should be wrapped in a channelMsg with a type of 'Job'.
     
-    exports.searchMsg = function(param, range /*, more parameters */)
+    exports.searchMsg = function(param, range, id)
     {
         var msg = {}
         msg.type = 'Search'
         msg.param = param
         msg.range = range
         // STUDENT TODO: add more parameters if necessary
+        msg.id = id
         
         msg.toString = function() { return msg.range.begin + '-' + msg.range.end }
         return msg
     }
 
-    exports.searchResponseMsg = function(/* STUDENT TODO: add parameers */)
+    exports.searchResponseMsg = function(results, id, finished)
     {
         var msg = {}
         msg.type = 'Matches'
         // STUDENT TODO
+        msg.results = results
+        msg.id = id
+        msg.finished = finished
 
         return msg
     }
     
     // STUDENT TODO: add more message types as necessary
+    exports.searchProgressMsg = function(percent, id)
+    {
+        var msg = {}
+        msg.type = 'Progress'
+        msg.percent = percent
+        msg.id = id
+
+        return msg
+    }
+
+    exports.searchExceptionMsg = function(exception, id)
+    {
+        var msg = {}
+        msg.type = 'Exception'
+        msg.exception = exception
+        msg.id = id
+
+        return msg
+    }
+
+    exports.searchCancelMsg = function(id)
+    {
+        var msg = {}
+        msg.type = 'Cancel'
+        msg.id = id
+
+        return msg
+    }
 
 //-------------------------------------------------------------------------------------------
 

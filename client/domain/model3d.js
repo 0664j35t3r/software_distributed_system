@@ -140,5 +140,3 @@ function parameterView(dbItem)
     queryParameter.appendChild(threshhold)
     return queryParameter
 }
-
-
